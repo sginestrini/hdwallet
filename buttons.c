@@ -26,7 +26,7 @@ uint16_t buttonRead(void) {
 	return gpio_port_read(BTN_PORT);
 }
 #endif
-
+/*prova*/
 void buttonUpdate()
 {
 	uint16_t state;
