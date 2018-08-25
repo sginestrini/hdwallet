@@ -1,0 +1,64 @@
+sudo: false
+dist: trusty
+language: c
+
+addons:
+  apt:
+    packages:
+      - build-essential
+      - gcc-arm-none-eabi
+      - libnewlib-arm-none-eabi
+      - python3-pip
+
+env:
+  global:
+    - MAKEFLAGS=-j2
+    - PYTHON=python3
+    - PROTOBUF_VERSION=3.4.0
+  matrix:
+    - DEBUG_LINK=0
+    - DEBUG_LINK=1
+
+matrix:
+  include:
+    - addons:
+        apt:
+          packages:
+            - gcc-multilib
+            - python3-pip
+      env:
+        - EMULATOR=1 HEADLESS=1
+        - DEBUG_LINK=1
+      before_script:
+        - $PYTHON -m pip install --user pipenv
+        - pipenv install
+      script:
+        # use outer environment (with protobuf & ecdsa) to build,
+        # then use pipenv to run tests
+        - ./script/cibuild && pipenv run script/test
+
+# using two "separate" python environments is somewhat unwieldy, and it would be nicer
+# to consolidate everything into one.
+# Unfortunately, installing pipenv and fetching python-trezor from git takes about one minute.
+# For now, we keep the envs separate. If the number of "outer" modules grows significantly,
+# they should probably be moved into pipenv.
+
+install:
+  - curl -LO "https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/protoc-${PROTOBUF_VERSION}-linux-x86_64.zip"
+  - unzip "protoc-${PROTOBUF_VERSION}-linux-x86_64.zip" -d protoc
+  - export PATH="$(pwd)/protoc/bin:$PATH"
+  - $PYTHON -m pip install --user "protobuf==${PROTOBUF_VERSION}"
+  - $PYTHON -m pip install --user ecdsa  # for firmware_sign
+
+script:
+  - script/cibuild
+  - make -C bootloader
+  - make -C demo
+
+notifications:
+  webhooks:
+    urls:
+      - http://ci-bot.satoshilabs.com:5000/travis
+    on_success: always
+    on_failure: always
+    on_start: always
